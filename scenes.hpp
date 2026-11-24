@@ -43,6 +43,15 @@ private:
     std::shared_ptr<Entity> _player;
     std::vector<std::shared_ptr<Entity>> _guards;
     std::vector<std::shared_ptr<Entity>> _terminals;
+    std::vector<std::shared_ptr<Entity>> _doors;
+
+    sf::Texture _tex_hacker;
+    sf::Texture _tex_guard;
+    sf::Texture _tex_computer;
+    sf::Texture _tex_hacked_computer;
+    sf::Texture _tex_closed_door;
+    sf::Texture _tex_open_door;
+    bool _textures_loaded = false;
     int _total_terminals = 0;
     int _hacked_terminals = 0;
     float _player_health = 100.0f;

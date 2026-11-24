@@ -23,6 +23,24 @@ protected:
     std::shared_ptr<sf::Shape> _shape;
 };
 
+class SpriteComponent : public Component {
+public:
+    SpriteComponent() = delete;
+    explicit SpriteComponent(Entity *const p);
+
+    void update(const float &dt) override;
+    void render() override;
+
+    void set_texture(const sf::Texture &texture, float target_size);
+    void set_flip_x(bool flip);
+    sf::Sprite &get_sprite();
+
+protected:
+    sf::Sprite _sprite;
+    sf::Vector2f _base_scale{1.0f, 1.0f};
+    bool _flip_x = false;
+};
+
 class ActorMovementComponent : public Component {
 public:
     explicit ActorMovementComponent(Entity *p,
@@ -89,6 +107,7 @@ public:
 
     State get_state() const { return _state; }
     bool is_seeing_player() const { return _seeing_player; }
+    sf::Vector2f get_direction() const { return _direction; }
     void set_patrol_direction(sf::Vector2f dir);
 
 private:
@@ -107,7 +126,7 @@ private:
 class TerminalComponent : public Component {
 public:
     TerminalComponent() = delete;
-    explicit TerminalComponent(Entity *p);
+    TerminalComponent(Entity *p, const sf::Texture *normal_tex, const sf::Texture *hacked_tex);
 
     void update(const float &dt) override;
     void render() override;
@@ -117,10 +136,13 @@ public:
     void add_progress(float delta);
 
 private:
+    void _apply_texture(const sf::Texture &tex);
+
     bool _hacked = false;
     float _progress = 0.0f;
-    sf::RectangleShape _box;
-    sf::RectangleShape _screen;
+    const sf::Texture *_normal_tex = nullptr;
+    const sf::Texture *_hacked_tex = nullptr;
+    sf::Sprite _sprite;
     sf::RectangleShape _bar_bg;
     sf::RectangleShape _bar;
 };

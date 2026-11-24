@@ -74,6 +74,23 @@ void GameScene::load() {
         _audio_loaded = true;
     }
 
+    if (!_textures_loaded) {
+        _tex_hacker.loadFromFile(res_path("resources/8bit/hacker.png"));
+        _tex_guard.loadFromFile(res_path("resources/8bit/guard.png"));
+        _tex_computer.loadFromFile(res_path("resources/8bit/computer.png"));
+        _tex_hacked_computer.loadFromFile(res_path("resources/8bit/hacked_computer.png"));
+        _tex_closed_door.loadFromFile(res_path("resources/8bit/closed_door.png"));
+        _tex_open_door.loadFromFile(res_path("resources/8bit/open_door.png"));
+
+        _tex_hacker.setSmooth(true);
+        _tex_guard.setSmooth(true);
+        _tex_computer.setSmooth(true);
+        _tex_hacked_computer.setSmooth(true);
+        _tex_closed_door.setSmooth(true);
+        _tex_open_door.setSmooth(true);
+        _textures_loaded = true;
+    }
+
     _hud_panel.setSize(sf::Vector2f(static_cast<float>(param::game_width), 32.0f));
     _hud_panel.setPosition(0.0f, 0.0f);
     _hud_panel.setFillColor(sf::Color(12, 16, 24, 240));
@@ -180,6 +197,7 @@ void GameScene::respawn() {
     _entities.list.clear();
     _guards.clear();
     _terminals.clear();
+    _doors.clear();
     _hacked_terminals = 0;
     _total_terminals = 0;
     _player_health = 100.0f;
@@ -192,6 +210,26 @@ void GameScene::respawn() {
     _was_sneaking = false;
     _hack_audio_timer = 0.0f;
 
+    std::vector<sf::Vector2i> end_tiles = ls::find_tiles(ls::END);
+    for (const auto &e_pos : end_tiles) {
+        auto door = std::make_shared<Entity>();
+        door->set_position(ls::get_tile_position(e_pos) + sf::Vector2f(param::tile_size * 0.5f, param::tile_size * 0.5f));
+        auto d_sprite = door->add_component<SpriteComponent>();
+        d_sprite->set_texture(_tex_closed_door, 28.0f);
+        _entities.list.push_back(door);
+        _doors.push_back(door);
+    }
+
+    std::vector<sf::Vector2i> term_tiles = ls::find_tiles(ls::TERMINAL);
+    _total_terminals = static_cast<int>(term_tiles.size());
+    for (const auto &t_pos : term_tiles) {
+        auto term = std::make_shared<Entity>();
+        term->set_position(ls::get_tile_position(t_pos) + sf::Vector2f(param::tile_size * 0.5f, param::tile_size * 0.5f));
+        term->add_component<TerminalComponent>(&_tex_computer, &_tex_hacked_computer);
+        _entities.list.push_back(term);
+        _terminals.push_back(term);
+    }
+
     _player = std::make_shared<Entity>();
     std::vector<sf::Vector2i> start_tiles = ls::find_tiles(ls::START);
     if (!start_tiles.empty()) {
@@ -199,38 +237,20 @@ void GameScene::respawn() {
     } else {
         _player->set_position(ls::get_start_position());
     }
-    auto p_shape = _player->add_component<ShapeComponent>();
-    p_shape->set_shape<sf::CircleShape>(param::entity_size);
-    p_shape->get_shape().setFillColor(sf::Color(40, 215, 120));
-    p_shape->get_shape().setOutlineColor(sf::Color(245, 250, 255));
-    p_shape->get_shape().setOutlineThickness(1.5f);
-    p_shape->get_shape().setOrigin(sf::Vector2f(param::entity_size, param::entity_size));
+    auto p_sprite = _player->add_component<SpriteComponent>();
+    p_sprite->set_texture(_tex_hacker, 28.0f);
     _player->add_component<PlayerMovementComponent>();
     _entities.list.push_back(_player);
-
-    std::vector<sf::Vector2i> term_tiles = ls::find_tiles(ls::TERMINAL);
-    _total_terminals = static_cast<int>(term_tiles.size());
-    for (const auto &t_pos : term_tiles) {
-        auto term = std::make_shared<Entity>();
-        term->set_position(ls::get_tile_position(t_pos) + sf::Vector2f(param::tile_size * 0.5f, param::tile_size * 0.5f));
-        term->add_component<TerminalComponent>();
-        _entities.list.push_back(term);
-        _terminals.push_back(term);
-    }
 
     std::vector<sf::Vector2i> enemy_tiles = ls::find_tiles(ls::ENEMY);
     for (size_t i = 0; i < enemy_tiles.size(); ++i) {
         auto guard = std::make_shared<Entity>();
         guard->set_position(ls::get_tile_position(enemy_tiles[i]) + sf::Vector2f(param::tile_size * 0.5f, param::tile_size * 0.5f));
 
-        auto g_shape = guard->add_component<ShapeComponent>();
-        g_shape->set_shape<sf::CircleShape>(param::entity_size);
-        g_shape->get_shape().setFillColor(sf::Color(225, 45, 45));
-        g_shape->get_shape().setOutlineColor(sf::Color(255, 180, 180));
-        g_shape->get_shape().setOutlineThickness(1.5f);
-        g_shape->get_shape().setOrigin(sf::Vector2f(param::entity_size, param::entity_size));
-
+        // Add GuardComponent first so the vision cone renders beneath the guard sprite
         auto g_comp = guard->add_component<GuardComponent>();
+        auto g_sprite = guard->add_component<SpriteComponent>();
+        g_sprite->set_texture(_tex_guard, 30.0f);
 
         // Assign vertical patrol if the guard stands in an open vertical shaft (>= 5 tiles tall)
         int gx = enemy_tiles[i].x;
@@ -370,8 +390,14 @@ void GameScene::update(const float &dt) {
         _hack_audio_timer = 0.0f;
     }
 
-    if (_hacked_terminals == _total_terminals && _total_terminals > 0) {
+    if (_hacked_terminals == _total_terminals && _total_terminals > 0 && !_door_unlocked) {
         _door_unlocked = true;
+        for (auto &door : _doors) {
+            auto d_sprite = door->get_compatible_components<SpriteComponent>();
+            if (!d_sprite.empty()) {
+                d_sprite[0]->set_texture(_tex_open_door, 28.0f);
+            }
+        }
     }
 
     if (_door_unlocked && ls::get_tile_at(p_pos) == ls::END) {
@@ -466,16 +492,37 @@ void GameScene::update(const float &dt) {
         }
     }
 
-    auto p_shape = _player->get_compatible_components<ShapeComponent>();
-    if (!p_shape.empty()) {
+    auto p_sprite = _player->get_compatible_components<SpriteComponent>();
+    if (!p_sprite.empty()) {
         if (_hit_cooldown > 0.0f) {
-            p_shape[0]->get_shape().setFillColor(sf::Color(255, 130, 130));
+            p_sprite[0]->get_sprite().setColor(sf::Color(255, 130, 130));
         } else if (exposed_to_guard) {
-            p_shape[0]->get_shape().setFillColor(sf::Color(255, 50, 50));
+            p_sprite[0]->get_sprite().setColor(sf::Color(255, 90, 90));
         } else if (player_sneaking) {
-            p_shape[0]->get_shape().setFillColor(sf::Color(40, 215, 120, 140));
+            p_sprite[0]->get_sprite().setColor(sf::Color(180, 255, 210, 150));
         } else {
-            p_shape[0]->get_shape().setFillColor(sf::Color(40, 215, 120));
+            p_sprite[0]->get_sprite().setColor(sf::Color::White);
+        }
+        if (!pmc.empty()) {
+            const float fx = pmc[0]->get_facing().x;
+            if (fx < -0.1f) {
+                p_sprite[0]->set_flip_x(true);
+            } else if (fx > 0.1f) {
+                p_sprite[0]->set_flip_x(false);
+            }
+        }
+    }
+
+    for (auto &g : _guards) {
+        auto gc = g->get_compatible_components<GuardComponent>();
+        auto gs_comp = g->get_compatible_components<SpriteComponent>();
+        if (!gc.empty() && !gs_comp.empty()) {
+            const float gx = gc[0]->get_direction().x;
+            if (gx < -0.1f) {
+                gs_comp[0]->set_flip_x(true);
+            } else if (gx > 0.1f) {
+                gs_comp[0]->set_flip_x(false);
+            }
         }
     }
 

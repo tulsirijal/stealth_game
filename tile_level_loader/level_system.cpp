@@ -12,7 +12,7 @@ sf::Vector2f LevelSystem::_start_position;
 float LevelSystem::_tile_size(100.f);
 std::vector<std::unique_ptr<sf::RectangleShape>> LevelSystem::_sprites;
 
-std::map<LevelSystem::Tile, sf::Color> LevelSystem::_colors{ {WALL, sf::Color(26, 32, 44)}, {END, sf::Color(35, 210, 85)}, {TERMINAL, sf::Color(255, 175, 25)} };
+std::map<LevelSystem::Tile, sf::Color> LevelSystem::_colors{ {WALL, sf::Color(26, 32, 44)} };
 
 int LevelSystem::get_height(){return _height;}
 int LevelSystem::get_width(){return _width;}

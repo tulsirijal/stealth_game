@@ -29,6 +29,42 @@ sf::Shape &ShapeComponent::get_shape() const {
     return *_shape;
 }
 
+SpriteComponent::SpriteComponent(Entity *const p) : Component(p) {}
+
+void SpriteComponent::set_texture(const sf::Texture &texture, float target_size) {
+    _sprite.setTexture(texture, true);
+    const sf::Vector2u sz = texture.getSize();
+    if (sz.x > 0 && sz.y > 0) {
+        _sprite.setOrigin(sz.x * 0.5f, sz.y * 0.5f);
+        const float max_dim = static_cast<float>(std::max(sz.x, sz.y));
+        const float scale = target_size / max_dim;
+        _base_scale = {scale, scale};
+        _sprite.setScale(_flip_x ? -_base_scale.x : _base_scale.x, _base_scale.y);
+    }
+}
+
+void SpriteComponent::set_flip_x(bool flip) {
+    _flip_x = flip;
+    _sprite.setScale(_flip_x ? -_base_scale.x : _base_scale.x, _base_scale.y);
+}
+
+sf::Sprite &SpriteComponent::get_sprite() {
+    return _sprite;
+}
+
+void SpriteComponent::update(const float &dt) {
+    _sprite.setPosition(_parent->get_position());
+    _sprite.setRotation(_parent->get_rotation());
+}
+
+void SpriteComponent::render() {
+    if (_parent->is_visible()) {
+        _sprite.setPosition(_parent->get_position());
+        _sprite.setRotation(_parent->get_rotation());
+        Renderer::queue(&_sprite);
+    }
+}
+
 ActorMovementComponent::ActorMovementComponent(Entity *p, uint64_t category_bits, uint64_t mask_bits)
     : Component(p), _speed(100.0f) {
     b2BodyDef body_def = b2DefaultBodyDef();
@@ -188,7 +224,6 @@ void PlayerMovementComponent::render() {
     if (_sneaking) {
         Renderer::queue(&_stealth_ring);
     }
-    Renderer::queue(&_visor);
 }
 
 GuardComponent::GuardComponent(Entity *p)
@@ -360,17 +395,11 @@ void GuardComponent::render() {
     Renderer::queue(&_vision_cone);
 }
 
-TerminalComponent::TerminalComponent(Entity *p) : Component(p) {
-    float size = 20.0f;
-    _box.setSize(sf::Vector2f(size, size));
-    _box.setOrigin(size * 0.5f, size * 0.5f);
-    _box.setFillColor(sf::Color(35, 28, 18));
-    _box.setOutlineColor(sf::Color(255, 175, 25));
-    _box.setOutlineThickness(2.0f);
-
-    _screen.setSize(sf::Vector2f(10.0f, 10.0f));
-    _screen.setOrigin(5.0f, 5.0f);
-    _screen.setFillColor(sf::Color(255, 215, 50));
+TerminalComponent::TerminalComponent(Entity *p, const sf::Texture *normal_tex, const sf::Texture *hacked_tex)
+    : Component(p), _normal_tex(normal_tex), _hacked_tex(hacked_tex) {
+    if (_normal_tex) {
+        _apply_texture(*_normal_tex);
+    }
 
     _bar_bg.setSize(sf::Vector2f(32.0f, 5.0f));
     _bar_bg.setFillColor(sf::Color(15, 15, 20));
@@ -381,22 +410,32 @@ TerminalComponent::TerminalComponent(Entity *p) : Component(p) {
     _bar.setFillColor(sf::Color(255, 185, 40));
 }
 
+void TerminalComponent::_apply_texture(const sf::Texture &tex) {
+    _sprite.setTexture(tex, true);
+    const sf::Vector2u sz = tex.getSize();
+    if (sz.x > 0 && sz.y > 0) {
+        _sprite.setOrigin(sz.x * 0.5f, sz.y * 0.5f);
+        const float max_dim = static_cast<float>(std::max(sz.x, sz.y));
+        const float scale = 26.0f / max_dim;
+        _sprite.setScale(scale, scale);
+    }
+}
+
 void TerminalComponent::add_progress(float delta) {
     if (_hacked) return;
     _progress += delta;
     if (_progress >= 1.0f) {
         _progress = 1.0f;
         _hacked = true;
-        _box.setFillColor(sf::Color(20, 60, 30));
-        _box.setOutlineColor(sf::Color(50, 240, 100));
-        _screen.setFillColor(sf::Color(50, 240, 100));
+        if (_hacked_tex) {
+            _apply_texture(*_hacked_tex);
+        }
     }
 }
 
 void TerminalComponent::update(const float &dt) {
     sf::Vector2f p = _parent->get_position();
-    _box.setPosition(p);
-    _screen.setPosition(p);
+    _sprite.setPosition(p);
 
     if (!_hacked && _progress > 0.0f) {
         _bar_bg.setPosition(p.x - 16.0f, p.y - 20.0f);
@@ -406,8 +445,8 @@ void TerminalComponent::update(const float &dt) {
 }
 
 void TerminalComponent::render() {
-    Renderer::queue(&_box);
-    Renderer::queue(&_screen);
+    _sprite.setPosition(_parent->get_position());
+    Renderer::queue(&_sprite);
     if (!_hacked && _progress > 0.0f) {
         Renderer::queue(&_bar_bg);
         Renderer::queue(&_bar);

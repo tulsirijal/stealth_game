@@ -36,7 +36,7 @@ public:
     static constexpr float physics_scale = 30.0f; // 30 pixels = 1 metre
     static constexpr float physics_scale_inv = 1.0f / physics_scale;
     static constexpr int sub_step_count = 4;
-    static constexpr float gravity = 0.0f; // Top-down game: no gravity
+    static constexpr float gravity = 0.0f; // Top-down game no gravity
 
 private:
     static b2WorldId _world_id;
